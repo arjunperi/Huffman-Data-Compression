@@ -27,7 +27,7 @@ public class HuffProcessor {
 	public HuffProcessor() {
 		this(0);
 	}
-	
+
 	public HuffProcessor(int debug) {
 		myDebugLevel = debug;
 	}
@@ -64,12 +64,52 @@ public class HuffProcessor {
 		if (magic != HUFF_TREE) {
 			throw new HuffException("invalid magic number "+magic);
 		}
-		out.writeBits(BITS_PER_INT,magic);
-		while (true){
-			int val = in.readBits(BITS_PER_WORD);
-			if (val == -1) break;
-			out.writeBits(BITS_PER_WORD, val);
-		}
+		HuffNode root = readTree(in);
+		readCompressedBits(root,in,out);
 		out.close();
+	}
+
+	private void readCompressedBits(HuffNode root, BitInputStream in, BitOutputStream out) {
+		HuffNode current = root;
+		while(true){
+			int bit = in.readBits(1);
+			if (bit == -1){
+				throw new HuffException("bad input, no PSEUDO_EOF");
+			}
+			else{
+				if (bit == 0) current = current.myLeft;
+				else{
+					current = current.myRight;
+				}
+				if (current == null){
+					break;
+				}
+				if (current.myLeft == null && current.myRight == null){
+					if(current.myValue == PSEUDO_EOF){
+						break;
+					}
+					else {
+						out.writeBits(BITS_PER_WORD, current.myValue);
+						current = root;
+					}
+				}
+				}
+			}
+		}
+
+	private HuffNode readTree(BitInputStream in) {
+		int bit = in.readBits(1);
+		if (bit == -1){
+			throw new HuffException("Exception");
+		}
+		if (bit ==0){
+			HuffNode left = readTree(in);
+			HuffNode right = readTree(in);
+			return new HuffNode(0,0,left,right);
+		}
+		else{
+			return new HuffNode(in.readBits(9),bit,null,null);
+
+		}
 	}
 }
